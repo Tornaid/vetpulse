@@ -183,3 +183,46 @@ export async function getReformulations(jobId: string): Promise<ReformulationRow
   });
   return result.rows.map((r) => ({ ...r })) as unknown as ReformulationRow[];
 }
+
+// ─── Clinics ─────────────────────────────────────────────────
+
+export interface ClinicRow {
+  id: string;
+  reqvet_org_id: string;
+  name: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function getClinics(): Promise<ClinicRow[]> {
+  const result = await db.execute("SELECT * FROM clinics ORDER BY created_at DESC");
+  return result.rows.map((r) => ({ ...r })) as unknown as ClinicRow[];
+}
+
+export async function getClinicByReqvetOrgId(orgId: string): Promise<ClinicRow | null> {
+  const result = await db.execute({
+    sql: "SELECT * FROM clinics WHERE reqvet_org_id = ?",
+    args: [orgId],
+  });
+  return result.rows[0] ? ({ ...result.rows[0] } as unknown as ClinicRow) : null;
+}
+
+export async function createClinicRecord(params: {
+  id: string;
+  reqvetOrgId: string;
+  name: string;
+  notes?: string | null;
+}): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO clinics (id, reqvet_org_id, name, notes, created_at)
+          VALUES (?, ?, ?, ?, datetime('now'))`,
+    args: [params.id, params.reqvetOrgId, params.name, params.notes ?? null],
+  });
+}
+
+export async function updateClinicNotes(reqvetOrgId: string, notes: string | null): Promise<void> {
+  await db.execute({
+    sql: "UPDATE clinics SET notes = ? WHERE reqvet_org_id = ?",
+    args: [notes, reqvetOrgId],
+  });
+}

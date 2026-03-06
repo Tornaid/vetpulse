@@ -1,0 +1,499 @@
+/* app/admin/admin.module.css */
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  font-family: var(--font-sans);
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* ── Boutons ─────────────────────────────────────────────────── */
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btnPrimary:hover:not(:disabled) { background: var(--accent-hover); }
+.btnPrimary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.btnGhost:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.btnGhost:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btnDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btnDanger:hover:not(:disabled) { background: #fee2e2; }
+.btnDanger:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btnRefresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btnRefresh:hover:not(:disabled) { background: var(--bg-inset); }
+.btnRefresh:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btnManage {
+  padding: 5px 12px;
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+}
+.btnManage:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent-border); }
+
+.btnCopy {
+  padding: 5px 12px;
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+}
+.btnCopy:hover { background: var(--success-bg); color: var(--success); border-color: #a7f3d0; }
+
+/* ── Badges ──────────────────────────────────────────────────── */
+
+.badgeActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.badgeActive::before {
+  content: "";
+  width: 6px; height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+}
+
+.badgeInactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.badgeInactive::before {
+  content: "";
+  width: 6px; height: 6px;
+  background: var(--text-muted);
+  border-radius: 50%;
+}
+
+/* ── Tableau ─────────────────────────────────────────────────── */
+
+.table {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.tableHead {
+  display: grid;
+  grid-template-columns: 2fr 100px 220px 110px 100px 80px;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 100px 220px 110px 100px 80px;
+  gap: 16px;
+  padding: 14px 20px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+.tableRow:last-child { border-bottom: none; }
+.tableRow:hover { background: var(--bg-surface-hover); }
+
+.tableRowInactive { opacity: 0.6; }
+
+.orgName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.orgEmail {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.orgNotes {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.quota {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.date {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Usage bar ───────────────────────────────────────────────── */
+
+.usageWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.usageBar {
+  height: 5px;
+  background: var(--bg-inset);
+  border-radius: 99px;
+  overflow: hidden;
+  width: 100%;
+}
+.usageFill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.usageLabel {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.usageMuted {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── States ──────────────────────────────────────────────────── */
+
+.emptyState {
+  text-align: center;
+  padding: 64px 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.errorBanner {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.errorMsg {
+  color: var(--danger);
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+
+/* ── Modal overlay ───────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 30, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  animation: fadeIn 0.2s ease;
+}
+
+.modalHeader {
+  padding: 24px 24px 0;
+}
+
+.modalTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px 24px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 20px;
+}
+
+/* ── Formulaire ──────────────────────────────────────────────── */
+
+.form {
+  padding: 20px 24px 0;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.fieldHint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--text-primary);
+  transition: border-color var(--transition);
+  outline: none;
+}
+.input:focus { border-color: var(--accent); background: #fff; }
+
+.textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  resize: vertical;
+  transition: border-color var(--transition);
+  outline: none;
+}
+.textarea:focus { border-color: var(--accent); background: #fff; }
+
+/* ── Credentials ─────────────────────────────────────────────── */
+
+.warningBanner {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.credBlock {
+  padding: 12px 24px;
+}
+
+.credLabel {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.credRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.credValue {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-primary);
+  word-break: break-all;
+  user-select: all;
+}
+
+.credInstructions {
+  margin: 4px 24px 8px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.credInstructionsTitle {
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.envPreview {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(37, 99, 235, 0.06);
+  border-radius: 4px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-primary);
+}
+
+/* ── Detail clinique ──────────────────────────────────────────── */
+
+.orgMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.usageDetail {
+  margin-bottom: 16px;
+}
+
+.confirmZone {
+  background: var(--danger-bg);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 4px;
+}
+
+.confirmText {
+  font-size: 13px;
+  color: var(--danger);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
