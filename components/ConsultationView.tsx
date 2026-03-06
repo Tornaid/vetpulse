@@ -93,6 +93,7 @@ export default function ConsultationView({
   const [motifText, setMotifText] = useState("");
   const [compteRenduText, setCompteRenduText] = useState("");
   const [conclusionText, setConclusionText] = useState("");
+  const [compteRenduEditing, setCompteRenduEditing] = useState(true);
 
   // Refs
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -189,7 +190,9 @@ export default function ConsultationView({
 
   useEffect(() => {
     setMotifText(consult?.motif ?? "");
-    setCompteRenduText(consult?.compte_rendu ?? "");
+    const cr = consult?.compte_rendu ?? "";
+    setCompteRenduText(cr);
+    setCompteRenduEditing(!/<[a-z][\s\S]*>/i.test(cr));
     setConclusionText(consult?.conclusion ?? "");
   }, [selectedId]);
 
@@ -199,6 +202,7 @@ export default function ConsultationView({
     if (!report) return;
     if (report.fields?.motif) setMotifText(String(report.fields.motif));
     setCompteRenduText(stripHtml(report.html));
+    setCompteRenduEditing(true);
     if (report.fields?.conclusion) setConclusionText(String(report.fields.conclusion));
   }, [report]);
 
@@ -556,14 +560,31 @@ export default function ConsultationView({
                       />
                     </div>
                     <div>
-                      <div className={styles.fieldLabel} style={{ marginBottom: 4 }}>Compte-Rendu</div>
-                      <textarea
-                        className={styles.textarea}
-                        value={compteRenduText}
-                        onChange={(e) => setCompteRenduText(e.target.value)}
-                        placeholder="Rédigez le compte-rendu ici, ou lancez la pipeline ReqVet pour le générer automatiquement…"
-                        style={{ minHeight: 140 }}
-                      />
+                      <div className={styles.fieldLabel} style={{ marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>Compte-Rendu</span>
+                        {compteRenduText && (
+                          <button
+                            style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", color: "#374151" }}
+                            onClick={() => setCompteRenduEditing((v) => !v)}
+                          >
+                            {compteRenduEditing ? "Aperçu" : "Modifier"}
+                          </button>
+                        )}
+                      </div>
+                      {compteRenduEditing ? (
+                        <textarea
+                          className={styles.textarea}
+                          value={compteRenduText}
+                          onChange={(e) => setCompteRenduText(e.target.value)}
+                          placeholder="Rédigez le compte-rendu ici, ou lancez la pipeline ReqVet pour le générer automatiquement…"
+                          style={{ minHeight: 140 }}
+                        />
+                      ) : (
+                        <div
+                          className={styles.reportViewer}
+                          dangerouslySetInnerHTML={{ __html: compteRenduText }}
+                        />
+                      )}
                     </div>
                     <div>
                       <div className={styles.fieldLabel} style={{ marginBottom: 4 }}>Conclusion</div>
