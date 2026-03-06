@@ -176,6 +176,34 @@ export async function updateConsultationDossier(params: {
   });
 }
 
+export async function createConsultation(params: {
+  id: string;
+  patientName: string;
+  patientSpecies: string;
+  patientBreed: string;
+  patientAge: string;
+  patientWeight: string;
+  ownerName: string;
+  vetName: string;
+  motif?: string;
+}): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO consultations (id, patient_name, patient_species, patient_breed, patient_age, patient_weight, owner_name, vet_name, motif, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    args: [
+      params.id,
+      params.patientName,
+      params.patientSpecies,
+      params.patientBreed,
+      params.patientAge,
+      params.patientWeight,
+      params.ownerName,
+      params.vetName,
+      params.motif ?? "",
+    ],
+  });
+}
+
 export async function getReformulations(jobId: string): Promise<ReformulationRow[]> {
   const result = await db.execute({
     sql: "SELECT * FROM reformulations WHERE job_id = ? ORDER BY created_at ASC",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { ConsultationRow } from "@/lib/db";
 import styles from "./ConsultationView.module.css";
 
@@ -43,9 +44,19 @@ export default function ConsultationView({
 }: {
   consultations: ConsultationRow[];
 }) {
+  const router = useRouter();
+
   // Navigation
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  // Nouvelle consultation
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newForm, setNewForm] = useState({
+    patient_name: "", patient_species: "Chien", patient_breed: "",
+    patient_age: "", patient_weight: "", owner_name: "", vet_name: "", motif: "",
+  });
 
   // Templates
   const [templates, setTemplates] = useState<{ system: Template[]; custom: Template[] } | null>(null);
@@ -314,6 +325,32 @@ export default function ConsultationView({
     setAmendMediaRecorder(null);
   }, [amendMediaRecorder]);
 
+  // ─── Créer une consultation ──────────────────────────────────
+
+  const handleCreateConsultation = useCallback(async () => {
+    if (!newForm.patient_name.trim() || !newForm.patient_species.trim() || !newForm.owner_name.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/consultations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newForm),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error ?? "Erreur création consultation");
+        return;
+      }
+      const { id } = await res.json();
+      setShowNewModal(false);
+      setNewForm({ patient_name: "", patient_species: "Chien", patient_breed: "", patient_age: "", patient_weight: "", owner_name: "", vet_name: "", motif: "" });
+      router.refresh();
+      setSelectedId(id);
+    } finally {
+      setCreating(false);
+    }
+  }, [newForm, router]);
+
   // ─── Submit Job (real API call through proxy) ───────────────
 
   const handleSubmitJob = useCallback(async () => {
@@ -484,6 +521,9 @@ export default function ConsultationView({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            <button className={styles.sidebarNewBtn} onClick={() => setShowNewModal(true)}>
+              + Nouvelle consultation
+            </button>
           </div>
           <div className={styles.sidebarList}>
             {filteredConsults.map((c) => (
@@ -953,6 +993,61 @@ export default function ConsultationView({
           )}
         </main>
       </div>
+
+      {/* ── Modal nouvelle consultation ───────────────────── */}
+      {showNewModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowNewModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalTitle}>Nouvelle consultation</div>
+            <div className={styles.modalGrid}>
+              <div className={styles.modalGridFull}>
+                <div className={styles.modalLabel}>Nom du patient *</div>
+                <input className={styles.modalInput} value={newForm.patient_name} onChange={(e) => setNewForm((f) => ({ ...f, patient_name: e.target.value }))} placeholder="Rex" />
+              </div>
+              <div>
+                <div className={styles.modalLabel}>Espèce *</div>
+                <select className={styles.modalInput} value={newForm.patient_species} onChange={(e) => setNewForm((f) => ({ ...f, patient_species: e.target.value }))}>
+                  {["Chien", "Chat", "Lapin", "Oiseau", "NAC", "Autre"].map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <div className={styles.modalLabel}>Race</div>
+                <input className={styles.modalInput} value={newForm.patient_breed} onChange={(e) => setNewForm((f) => ({ ...f, patient_breed: e.target.value }))} placeholder="Berger Allemand" />
+              </div>
+              <div>
+                <div className={styles.modalLabel}>Âge</div>
+                <input className={styles.modalInput} value={newForm.patient_age} onChange={(e) => setNewForm((f) => ({ ...f, patient_age: e.target.value }))} placeholder="3 ans" />
+              </div>
+              <div>
+                <div className={styles.modalLabel}>Poids</div>
+                <input className={styles.modalInput} value={newForm.patient_weight} onChange={(e) => setNewForm((f) => ({ ...f, patient_weight: e.target.value }))} placeholder="12 kg" />
+              </div>
+              <div>
+                <div className={styles.modalLabel}>Propriétaire *</div>
+                <input className={styles.modalInput} value={newForm.owner_name} onChange={(e) => setNewForm((f) => ({ ...f, owner_name: e.target.value }))} placeholder="Jean Dupont" />
+              </div>
+              <div>
+                <div className={styles.modalLabel}>Vétérinaire</div>
+                <input className={styles.modalInput} value={newForm.vet_name} onChange={(e) => setNewForm((f) => ({ ...f, vet_name: e.target.value }))} placeholder="Dr. Martin" />
+              </div>
+              <div className={styles.modalGridFull}>
+                <div className={styles.modalLabel}>Motif</div>
+                <input className={styles.modalInput} value={newForm.motif} onChange={(e) => setNewForm((f) => ({ ...f, motif: e.target.value }))} placeholder="Vaccination annuelle…" />
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={() => setShowNewModal(false)} disabled={creating}>Annuler</button>
+              <button
+                className={styles.btnPrimary}
+                onClick={handleCreateConsultation}
+                disabled={creating || !newForm.patient_name.trim() || !newForm.owner_name.trim()}
+              >
+                {creating ? "Création…" : "Créer la consultation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
