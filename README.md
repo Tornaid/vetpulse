@@ -119,16 +119,27 @@ TURSO_AUTH_TOKEN=         # Token Turso
 
 ### 3. Créer et initialiser la base Turso
 
+Installer le CLI Turso :
+
 ```bash
-# Installer Turso CLI
+# Mac / Linux
 curl -sSfL https://get.tur.so/install.sh | bash
 
-# Créer la base
+# Windows (PowerShell)
+winget install turso
+```
+
+Créer la base et récupérer les credentials :
+
+```bash
 turso db create vetpulse
 turso db show vetpulse --url       # → TURSO_DATABASE_URL
 turso db tokens create vetpulse    # → TURSO_AUTH_TOKEN
+```
 
-# Créer les tables et insérer les données de démo
+Créer les tables et insérer les données de démo :
+
+```bash
 npm run db:setup
 ```
 
