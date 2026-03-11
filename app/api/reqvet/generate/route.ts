@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
 
     const audio = form.get("audio") as File | null;
     const animalName = form.get("animalName") as string | null;
+    const animalBreed = (form.get("animalBreed") as string | null) || undefined;
+    const animalAge   = (form.get("animalAge")   as string | null) || undefined;
     const templateId = form.get("templateId") as string | null;
     const consultationId = form.get("consultationId") as string | null;
     const extraInstructions = form.get("extraInstructions") as string | null;
@@ -61,6 +63,8 @@ export async function POST(req: NextRequest) {
     const job = await reqvet.createJob({
       audioFile: audioPath,
       animalName,
+      animalBreed,  // depuis le profil patient (patient_breed)
+      animalAge,    // depuis le profil patient (patient_age)
       templateId,
       callbackUrl,
       metadata: {

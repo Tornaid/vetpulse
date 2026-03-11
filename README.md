@@ -100,9 +100,9 @@ La clé clinique n'est jamais stockée en base — elle est remise une seule foi
 
 ## Flux complet — génération d'un compte-rendu
 
-1. **Frontend** enregistre l'audio → `POST /api/reqvet/generate`
-2. **Proxy** : `reqvet.getSignedUploadUrl()` → `PUT` direct Supabase → `reqvet.createJob({ callbackUrl })`
-3. **ReqVet** traite en arrière-plan (transcription → génération IA)
+1. **Frontend** enregistre l'audio → `POST /api/reqvet/generate` (avec `animalName`, `animalBreed`, `animalAge` issus du profil patient)
+2. **Proxy** : `reqvet.getSignedUploadUrl()` → `PUT` direct Supabase → `reqvet.createJob({ animalBreed, animalAge, callbackUrl })`
+3. **ReqVet** traite en arrière-plan (transcription → génération IA avec contexte race + âge)
 4. **ReqVet** poste le résultat sur `/api/reqvet/webhook` (signé HMAC)
 5. **Webhook handler** : vérifie la signature, déduplique, sauvegarde HTML/transcription/fields en Turso
 6. **Frontend** poll `/api/reqvet/job` → affiche le compte-rendu et remplit les champs éditables
@@ -310,6 +310,30 @@ vetpulse/
 ---
 
 ## Points techniques clés
+
+### Contexte clinique patient (race + âge)
+
+La table `consultations` contient déjà `patient_breed` et `patient_age` dans le profil patient.
+VetPulse les transmet automatiquement à ReqVet à chaque création de job — sans configuration supplémentaire.
+
+```
+ConsultationRow.patient_breed  →  form "animalBreed"  →  reqvet.createJob({ animalBreed })
+ConsultationRow.patient_age    →  form "animalAge"    →  reqvet.createJob({ animalAge })
+```
+
+Côté ReqVet, ces données sont injectées dans le **signalement patient** des prompts LLM :
+
+```
+SIGNALEMENT DU PATIENT :
+- Nom : Rex
+- Race : Labrador Retriever
+- Âge : 5 ans
+```
+
+L'impact est particulièrement visible sur le mode `diagnostic_hypothesis` : le LLM prend en compte
+les prédispositions raciales et les pathologies liées à la tranche d'âge dans ses hypothèses différentielles.
+
+---
 
 ### Upload audio sans limite de taille
 

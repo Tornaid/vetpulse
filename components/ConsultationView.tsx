@@ -374,6 +374,9 @@ export default function ConsultationView({
       const form = new FormData();
       form.append("audio", uploadedFile);
       form.append("animalName", consult.patient_name);
+      // Profil patient — enrichit le contexte clinique des prompts LLM
+      if (consult.patient_breed) form.append("animalBreed", consult.patient_breed);
+      if (consult.patient_age)   form.append("animalAge",   consult.patient_age);
       form.append("templateId", selectedTemplate);
       form.append("consultationId", consult.id);
       if (extraInstructions.trim()) {
