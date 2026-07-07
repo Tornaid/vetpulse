@@ -389,26 +389,48 @@ export default function ConsultationView({
     setActiveTab("report");
 
     try {
-      const form = new FormData();
-      form.append("audio", uploadedFile);
-      form.append("animalName", consult.patient_name);
-      // Profil patient — enrichit le contexte clinique des prompts LLM
-      if (consult.patient_breed) form.append("animalBreed", consult.patient_breed);
-      if (consult.patient_age)   form.append("animalAge",   consult.patient_age);
-      form.append("templateId", selectedTemplate);
-      form.append("consultationId", consult.id);
-      if (extraInstructions.trim()) {
-        form.append("extraInstructions", extraInstructions.trim());
+      // 1. Demander une URL signée à notre proxy (JSON léger)
+      const signedRes = await fetch("/api/reqvet/signed-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: uploadedFile.name || "consultation.webm",
+          contentType: uploadedFile.type || "audio/webm",
+        }),
+      });
+      if (!signedRes.ok) {
+        const err = await signedRes.json().catch(() => ({}));
+        throw new Error(err.error || `Erreur signed-upload ${signedRes.status}`);
+      }
+      const { uploadUrl, path: audioPath } = await signedRes.json();
+
+      // 2. Upload direct navigateur → Supabase (bypass la limite Vercel 4,5 Mo)
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": uploadedFile.type || "audio/webm" },
+        body: uploadedFile,
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`Upload Supabase échoué (${uploadRes.status})`);
       }
 
-      // POST vers notre proxy — PAS directement vers ReqVet
+      // 3. Créer le job avec le path (JSON léger)
       const res = await fetch("/api/reqvet/generate", {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audioPath,
+          animalName: consult.patient_name,
+          animalBreed: consult.patient_breed || undefined,
+          animalAge: consult.patient_age || undefined,
+          templateId: selectedTemplate,
+          consultationId: consult.id,
+          ...(extraInstructions.trim() ? { extraInstructions: extraInstructions.trim() } : {}),
+        }),
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Erreur HTTP ${res.status}`);
       }
 
@@ -463,17 +485,40 @@ export default function ConsultationView({
 
     setAmendSubmitting(true);
     try {
-      const form = new FormData();
-      form.append("audio", amendFile);
-      form.append("jobId", jobId);
+      // 1. URL signée pour le complément
+      const signedRes = await fetch("/api/reqvet/signed-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: amendFile.name || "complement.webm",
+          contentType: amendFile.type || "audio/webm",
+        }),
+      });
+      if (!signedRes.ok) {
+        const err = await signedRes.json().catch(() => ({}));
+        throw new Error(err.error || `Erreur signed-upload ${signedRes.status}`);
+      }
+      const { uploadUrl, path: audioPath } = await signedRes.json();
 
+      // 2. Upload direct vers Supabase
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": amendFile.type || "audio/webm" },
+        body: amendFile,
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`Upload Supabase échoué (${uploadRes.status})`);
+      }
+
+      // 3. Soumettre l'amendement avec le path
       const res = await fetch("/api/reqvet/amend", {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioPath, jobId }),
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Erreur amendement");
       }
 
