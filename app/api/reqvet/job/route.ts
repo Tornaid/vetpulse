@@ -28,16 +28,17 @@ export async function GET(req: NextRequest) {
       let costs: { transcription_usd: number | null; generation_usd: number | null; total_usd: number | null } | null = null;
       try {
         const remoteJob = await reqvet.getJob(jobId) as {
-          cost_transcription?: number | string | null;
-          cost_generation?: number | string | null;
+          cost?: { transcription_usd?: number; generation_usd?: number; total_usd?: number };
         };
-        const t = remoteJob.cost_transcription != null ? Number(remoteJob.cost_transcription) : null;
-        const g = remoteJob.cost_generation != null ? Number(remoteJob.cost_generation) : null;
-        costs = {
-          transcription_usd: t,
-          generation_usd: g,
-          total_usd: (t ?? 0) + (g ?? 0),
-        };
+        if (remoteJob.cost) {
+          const t = remoteJob.cost.transcription_usd ?? null;
+          const g = remoteJob.cost.generation_usd ?? null;
+          costs = {
+            transcription_usd: t,
+            generation_usd: g,
+            total_usd: remoteJob.cost.total_usd ?? (t ?? 0) + (g ?? 0),
+          };
+        }
       } catch {
         // pas bloquant — on affiche le CR sans les coûts
       }
@@ -65,8 +66,7 @@ export async function GET(req: NextRequest) {
       status: string;
       transcription?: string | null;
       result?: { html?: string | null; fields?: Record<string, unknown> | null };
-      cost_transcription?: number | string | null;
-      cost_generation?: number | string | null;
+      cost?: { transcription_usd?: number; generation_usd?: number; total_usd?: number };
     };
 
     // Si le job est completed côté ReqVet mais pas encore en base
@@ -81,8 +81,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const t = remoteJob.cost_transcription != null ? Number(remoteJob.cost_transcription) : null;
-    const g = remoteJob.cost_generation != null ? Number(remoteJob.cost_generation) : null;
+    const t = remoteJob.cost?.transcription_usd ?? null;
+    const g = remoteJob.cost?.generation_usd ?? null;
 
     return NextResponse.json({
       status: remoteJob.status,
@@ -90,8 +90,12 @@ export async function GET(req: NextRequest) {
       transcription: remoteJob.transcription ?? null,
       fields: remoteJob.result?.fields ?? null,
       amendment_number: localJob?.amendment_number ?? 0,
-      costs: (t != null || g != null)
-        ? { transcription_usd: t, generation_usd: g, total_usd: (t ?? 0) + (g ?? 0) }
+      costs: remoteJob.cost
+        ? {
+            transcription_usd: t,
+            generation_usd: g,
+            total_usd: remoteJob.cost.total_usd ?? (t ?? 0) + (g ?? 0),
+          }
         : null,
     });
   } catch (err: unknown) {
