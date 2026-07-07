@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { ConsultationRow } from "@/lib/db";
 import styles from "./ConsultationView.module.css";
 
@@ -522,6 +523,8 @@ export default function ConsultationView({
           <button className={styles.topbarNavItem}>Facturation</button>
         </nav>
         <div className={styles.topbarRight}>
+          <Link href="/documentation" className={styles.topbarMetaLink}>Documentation</Link>
+          <Link href="/admin" className={styles.topbarMetaLink}>Admin</Link>
           <span className={styles.reqvetBadge}>ReqVet connecté ✓</span>
           <div className={styles.vetAvatar}>
             <div className={styles.vetAvatarCircle}>DM</div>
