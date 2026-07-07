@@ -274,6 +274,22 @@
   font-weight: 600;
 }
 
+/* Petit tag opex à côté du label "Marge nette" */
+.opexTag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+
 /* ─── Boutons ─────────────────────────────────────── */
 
 .btnSecondary {

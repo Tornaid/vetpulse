@@ -80,6 +80,9 @@ interface Pricing {
   nbClinics: number;
   projectionModel: ProjectionModel; // scénario retenu pour le ROI
   investment: number;      // € — cession + setup + dev
+  // Opex (hébergement, monitoring, support, maintenance, salaires ops…)
+  // exprimé en % de la marge BRUTE — 20 % = SaaS lean typique
+  opexPct: number;
 }
 
 const DEFAULT_PRICING: Pricing = {
@@ -90,6 +93,7 @@ const DEFAULT_PRICING: Pricing = {
   nbClinics: 50,
   projectionModel: "pack",
   investment: 60000,
+  opexPct: 20,
 };
 
 function loadPricing(): Pricing {
@@ -375,7 +379,20 @@ export default function CostsClient() {
   const monthlyMargin = monthlyRevenue - monthlyCost;
   const monthlyMarginPct = monthlyRevenue > 0 ? (monthlyMargin / monthlyRevenue) * 100 : 0;
   const yearlyMargin = monthlyMargin * 12;
-  const roiMonths = monthlyMargin > 0 ? pricing.investment / monthlyMargin : null;
+
+  // ─── Marge nette : marge brute − opex estimés ────────────
+  // Opex = hébergement, monitoring, Sentry, support niveau 1/2,
+  // maintenance dev, on-call, comptabilité, part fixe salaires ops.
+  // Exprimé en % de la marge brute (approximation lean).
+  const monthlyOpex = monthlyMargin * (pricing.opexPct / 100);
+  const monthlyMarginNet = monthlyMargin - monthlyOpex;
+  const monthlyMarginNetPct =
+    monthlyRevenue > 0 ? (monthlyMarginNet / monthlyRevenue) * 100 : 0;
+  const yearlyMarginNet = monthlyMarginNet * 12;
+
+  // Le ROI se base sur la marge NETTE — c'est le cash réellement dispo
+  // pour rembourser l'investissement initial.
+  const roiMonths = monthlyMarginNet > 0 ? pricing.investment / monthlyMarginNet : null;
 
   const projectionLabel =
     pricing.projectionModel === "pack"
@@ -861,6 +878,30 @@ export default function CostsClient() {
               Cession reqvet-engine + setup infra + dev intégration
             </span>
           </div>
+
+          <div className={controls.field}>
+            <label>Opex estimés (% marge brute)</label>
+            <div className={controls.inputWithSuffix}>
+              <input
+                type="number"
+                step={5}
+                min={0}
+                max={100}
+                value={pricing.opexPct}
+                onChange={(e) =>
+                  setPricing({
+                    ...pricing,
+                    opexPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                  })
+                }
+              />
+              <span>%</span>
+            </div>
+            <span className={controls.hint}>
+              Hébergement, monitoring, support, maintenance, on-call…
+              20&nbsp;% = SaaS lean typique.
+            </span>
+          </div>
         </div>
 
         {/* KPIs de projection */}
@@ -902,6 +943,25 @@ export default function CostsClient() {
           </div>
 
           <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>
+              Marge nette mensuelle
+              <span className={controls.opexTag}>opex {pricing.opexPct}%</span>
+            </span>
+            <span
+              className={
+                monthlyMarginNet >= 0
+                  ? `${styles.kpiValue} ${styles.kpiAccent}`
+                  : `${styles.kpiValue} ${styles.kpiDanger}`
+              }
+            >
+              {fmtEur(monthlyMarginNet)}
+            </span>
+            <span className={styles.kpiSub}>
+              {monthlyMarginNetPct.toFixed(0)}% · annuel {fmtEur(yearlyMarginNet)}
+            </span>
+          </div>
+
+          <div className={styles.kpiCard}>
             <span className={styles.kpiLabel}>Retour sur investissement</span>
             <span
               className={
@@ -920,27 +980,29 @@ export default function CostsClient() {
             </span>
             <span className={styles.kpiSub}>
               {roiMonths !== null
-                ? `${fmtEur(pricing.investment)} ÷ marge mensuelle`
-                : "Marge négative — pas de ROI possible"}
+                ? `${fmtEur(pricing.investment)} ÷ marge nette mensuelle`
+                : "Marge nette négative — pas de ROI possible"}
             </span>
           </div>
         </div>
 
         {/* Verdict projection */}
-        {monthlyMargin > 0 && roiMonths !== null && (
+        {monthlyMarginNet > 0 && roiMonths !== null && (
           <div className={controls.summary} style={{ marginTop: 20 }}>
             <p>
               Scénario <strong>{projectionLabel}</strong> appliqué à{" "}
               <strong>{pricing.nbClinics} cliniques</strong> : CA mensuel{" "}
               <strong>{fmtEur(monthlyRevenue)}</strong>, marge brute annuelle{" "}
-              <strong>{fmtEur(yearlyMargin)}</strong>. L&apos;investissement de{" "}
-              <strong>{fmtEur(pricing.investment)}</strong> est rentabilisé en{" "}
+              <strong>{fmtEur(yearlyMargin)}</strong>, marge nette annuelle{" "}
+              <strong>{fmtEur(yearlyMarginNet)}</strong> (après {pricing.opexPct}&nbsp;% d&apos;opex).
+              L&apos;investissement de <strong>{fmtEur(pricing.investment)}</strong> est
+              rentabilisé en{" "}
               <strong>
                 {roiMonths < 12
                   ? `${roiMonths.toFixed(1)} mois`
                   : `${(roiMonths / 12).toFixed(1)} années`}
-              </strong>
-              .
+              </strong>{" "}
+              (sur marge nette).
             </p>
           </div>
         )}
