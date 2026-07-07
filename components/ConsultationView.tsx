@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { ConsultationRow } from "@/lib/db";
 import styles from "./ConsultationView.module.css";
@@ -104,7 +104,9 @@ export default function ConsultationView({
   const [motifText, setMotifText] = useState("");
   const [compteRenduText, setCompteRenduText] = useState("");
   const [conclusionText, setConclusionText] = useState("");
+  const [motifEditing, setMotifEditing] = useState(false);
   const [compteRenduEditing, setCompteRenduEditing] = useState(true);
+  const [conclusionEditing, setConclusionEditing] = useState(false);
 
   // Refs
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -200,21 +202,36 @@ export default function ConsultationView({
   // ─── Réinitialise les champs au changement de consultation ──
 
   useEffect(() => {
-    setMotifText(consult?.motif ?? "");
+    const motif = consult?.motif ?? "";
+    setMotifText(motif);
+    // Motif vide → mode édition (on veut pouvoir taper). Sinon aperçu (lecture).
+    setMotifEditing(!motif);
+
     const cr = consult?.compte_rendu ?? "";
     setCompteRenduText(cr);
     setCompteRenduEditing(!/<[a-z][\s\S]*>/i.test(cr));
-    setConclusionText(consult?.conclusion ?? "");
+
+    const conc = consult?.conclusion ?? "";
+    setConclusionText(conc);
+    setConclusionEditing(!/<[a-z][\s\S]*>/i.test(conc));
   }, [selectedId]);
 
   // ─── Auto-remplit les champs quand la pipeline termine ───────
 
   useEffect(() => {
     if (!report) return;
-    if (report.fields?.motif) setMotifText(String(report.fields.motif));
-    setCompteRenduText(stripHtml(report.html));
-    setCompteRenduEditing(true);
-    if (report.fields?.conclusion) setConclusionText(String(report.fields.conclusion));
+    if (report.fields?.motif) {
+      setMotifText(String(report.fields.motif));
+      setMotifEditing(false); // afficher en aperçu après extraction
+    }
+    // On garde le HTML structuré (auparavant stripHtml massacrait la mise en forme).
+    // Par défaut, on montre l'aperçu — l'utilisateur peut passer en Modifier s'il veut.
+    setCompteRenduText(report.html ?? "");
+    setCompteRenduEditing(false);
+    if (report.fields?.conclusion) {
+      setConclusionText(String(report.fields.conclusion));
+      setConclusionEditing(false);
+    }
   }, [report]);
 
   // ─── Autosave dossier (debounce 1 s) ────────────────────────
@@ -592,53 +609,39 @@ export default function ConsultationView({
                 {/* ── Dossier — toujours visible ───────────── */}
                 <Section icon="📋" title="Dossier de consultation" iconBg="#f0fdf4" iconColor="#16a34a">
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div>
-                      <div className={styles.fieldLabel} style={{ marginBottom: 4 }}>Motif</div>
-                      <textarea
-                        className={styles.textarea}
-                        value={motifText}
-                        onChange={(e) => setMotifText(e.target.value)}
-                        placeholder="Motif de la consultation…"
-                        style={{ minHeight: 60 }}
-                      />
-                    </div>
-                    <div>
-                      <div className={styles.fieldLabel} style={{ marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span>Compte-Rendu</span>
-                        {compteRenduText && (
-                          <button
-                            style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", color: "#374151" }}
-                            onClick={() => setCompteRenduEditing((v) => !v)}
-                          >
-                            {compteRenduEditing ? "Aperçu" : "Modifier"}
-                          </button>
-                        )}
-                      </div>
-                      {compteRenduEditing ? (
-                        <textarea
-                          className={styles.textarea}
-                          value={compteRenduText}
-                          onChange={(e) => setCompteRenduText(e.target.value)}
-                          placeholder="Rédigez le compte-rendu ici, ou lancez la pipeline ReqVet pour le générer automatiquement…"
-                          style={{ minHeight: 140 }}
-                        />
-                      ) : (
-                        <div
-                          className={styles.reportViewer}
-                          dangerouslySetInnerHTML={{ __html: compteRenduText }}
-                        />
-                      )}
-                    </div>
-                    <div>
-                      <div className={styles.fieldLabel} style={{ marginBottom: 4 }}>Conclusion</div>
-                      <textarea
-                        className={styles.textarea}
-                        value={conclusionText}
-                        onChange={(e) => setConclusionText(e.target.value)}
-                        placeholder="Conclusion…"
-                        style={{ minHeight: 60 }}
-                      />
-                    </div>
+                    <CompteRenduBox
+                      value={motifText}
+                      onChange={setMotifText}
+                      editing={motifEditing}
+                      onToggleEditing={setMotifEditing}
+                      isGeneratedByReqVet={jobStatus === "completed"}
+                      title="Motif de consultation"
+                      icon="🎯"
+                      placeholder={`Ex : Boiterie postérieure gauche depuis 3 jours
+
+Court, sans phrase complète — format « symptôme + localisation + durée ».
+Sera extrait automatiquement par ReqVet si le field_schema est configuré.`}
+                      emptyTitle="Aucun motif renseigné"
+                      emptySubtitle="Il sera extrait automatiquement à la génération du CR, ou vous pouvez le saisir directement en Markdown allégé."
+                    />
+                    <CompteRenduBox
+                      value={compteRenduText}
+                      onChange={setCompteRenduText}
+                      editing={compteRenduEditing}
+                      onToggleEditing={setCompteRenduEditing}
+                      isGeneratedByReqVet={jobStatus === "completed"}
+                    />
+                    <CompteRenduBox
+                      value={conclusionText}
+                      onChange={setConclusionText}
+                      editing={conclusionEditing}
+                      onToggleEditing={setConclusionEditing}
+                      isGeneratedByReqVet={jobStatus === "completed"}
+                      title="Conclusion clinique"
+                      icon="🩺"
+                      emptyTitle="Aucune conclusion pour le moment"
+                      emptySubtitle="La conclusion sera extraite automatiquement du CR généré (diagnostic, examens complémentaires, suivi), ou vous pouvez la rédiger directement."
+                    />
                   </div>
                 </Section>
 
@@ -756,7 +759,11 @@ export default function ConsultationView({
                   <div className="fade-in">
                     <Section icon="⚡" title="Pipeline ReqVet" iconBg="#eef2ff" iconColor="#6366f1">
                       <PipelineProgress status={jobStatus} />
-                      <p className={styles.muted} style={{ textAlign: "center", marginTop: 16 }}>
+                      <p
+                        className={styles.muted}
+                        style={{ textAlign: "center", marginTop: 16, display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", width: "100%" }}
+                      >
+                        <span className="spinner" style={{ color: "#6366f1" }} />
                         {jobStatus === "uploading" && "Envoi de l'audio vers ReqVet…"}
                         {jobStatus === "pending" && "Job créé — en attente de traitement…"}
                         {jobStatus === "transcribing" && "Transcription de la consultation par Whisper…"}
@@ -830,18 +837,7 @@ export default function ConsultationView({
                         {report.fields ? (
                           <div className={styles.fieldsGrid}>
                             {Object.entries(report.fields).map(([key, val]) => (
-                              <div className={styles.fieldItem} key={key}>
-                                <div className={styles.fieldLabel}>{key}</div>
-                                <div className={styles.fieldValue}>
-                                  {val === null
-                                    ? "—"
-                                    : typeof val === "boolean"
-                                    ? val
-                                      ? "Oui"
-                                      : "Non"
-                                    : String(val)}
-                                </div>
-                              </div>
+                              <FieldItem key={key} fieldKey={key} value={val} />
                             ))}
                           </div>
                         ) : (
@@ -1061,6 +1057,484 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// ─── Field item — rendu adaptatif selon le type ─────────────
+
+interface FieldItemProps {
+  fieldKey: string;
+  value: unknown;
+}
+
+function humanizeKey(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function FieldItem({ fieldKey, value }: FieldItemProps) {
+  // ─── null / undefined ───
+  if (value === null || value === undefined) {
+    return (
+      <div className={styles.fieldItem}>
+        <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+        <div className={styles.fieldValue} style={{ color: "#9ca3af", fontStyle: "italic" }}>
+          —
+        </div>
+      </div>
+    );
+  }
+
+  // ─── boolean ───
+  if (typeof value === "boolean") {
+    return (
+      <div className={styles.fieldItem}>
+        <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+        <div className={styles.fieldValue}>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "3px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              background: value ? "rgba(0, 209, 125, 0.10)" : "rgba(107, 114, 128, 0.10)",
+              color: value ? "#065f46" : "#4b5563",
+              border: value ? "1px solid rgba(0, 209, 125, 0.25)" : "1px solid rgba(107, 114, 128, 0.20)",
+            }}
+          >
+            {value ? "✓ Oui" : "✕ Non"}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── number ───
+  if (typeof value === "number") {
+    return (
+      <div className={styles.fieldItem}>
+        <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+        <div
+          className={styles.fieldValue}
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            fontWeight: 600,
+            color: "#111827",
+          }}
+        >
+          {value.toLocaleString("fr-FR", { maximumFractionDigits: 3 })}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── array ───
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return (
+        <div className={styles.fieldItem}>
+          <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+          <div className={styles.fieldValue} style={{ color: "#9ca3af", fontStyle: "italic" }}>
+            (vide)
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className={styles.fieldItem}>
+        <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+        <ul
+          style={{
+            margin: 0,
+            paddingLeft: 18,
+            listStyle: "disc",
+            color: "#374151",
+          }}
+        >
+          {value.map((item, i) => (
+            <li
+              key={i}
+              style={{ marginBottom: 3, fontSize: 13, lineHeight: 1.55 }}
+            >
+              {typeof item === "object" ? JSON.stringify(item) : String(item)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  // ─── string : détecter HTML vs texte ───
+  if (typeof value === "string") {
+    const str = value.trim();
+    if (!str) {
+      return (
+        <div className={styles.fieldItem}>
+          <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+          <div className={styles.fieldValue} style={{ color: "#9ca3af", fontStyle: "italic" }}>
+            (vide)
+          </div>
+        </div>
+      );
+    }
+
+    // HTML → rendu structuré via crViewer (mêmes styles que le compte rendu)
+    if (/<[a-z][\s\S]*>/i.test(str)) {
+      return (
+        <div className={styles.fieldItem}>
+          <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+          <div
+            className={styles.crViewer}
+            style={{ padding: "12px 16px", minHeight: 0 }}
+            dangerouslySetInnerHTML={{ __html: str }}
+          />
+        </div>
+      );
+    }
+
+    // Texte simple — préserver les sauts de ligne
+    return (
+      <div className={styles.fieldItem}>
+        <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+        <div
+          className={styles.fieldValue}
+          style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}
+        >
+          {str}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── fallback : objet ou autre ───
+  return (
+    <div className={styles.fieldItem}>
+      <div className={styles.fieldLabel}>{humanizeKey(fieldKey)}</div>
+      <pre
+        style={{
+          margin: 0,
+          padding: "8px 12px",
+          background: "#f9fafb",
+          border: "1px solid rgba(0, 0, 0, 0.06)",
+          borderRadius: 8,
+          fontSize: 12,
+          fontFamily: "var(--font-mono, monospace)",
+          color: "#374151",
+          overflow: "auto",
+        }}
+      >
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+// ─── Rich box — rendu intelligent HTML ⇄ Markdown ──────────
+// Utilisé pour Compte rendu ET Conclusion (et autres champs riches à venir).
+
+interface CompteRenduBoxProps {
+  value: string;
+  onChange: (v: string) => void;
+  editing: boolean;
+  onToggleEditing: (v: boolean) => void;
+  isGeneratedByReqVet?: boolean;
+  /** Titre affiché dans le header (défaut : "Compte rendu") */
+  title?: string;
+  /** Icône emoji dans le header (défaut : "📝") */
+  icon?: string;
+  /** Placeholder de l'éditeur */
+  placeholder?: string;
+  /** Titre de l'état vide */
+  emptyTitle?: string;
+  /** Sous-titre de l'état vide */
+  emptySubtitle?: string;
+}
+
+function CompteRenduBox({
+  value,
+  onChange,
+  editing,
+  onToggleEditing,
+  isGeneratedByReqVet,
+  title = "Compte rendu",
+  icon = "📝",
+  placeholder,
+  emptyTitle = "Aucun compte rendu pour le moment",
+  emptySubtitle = "Enregistrez la consultation ci-dessous puis cliquez sur « Générer » — le CR apparaîtra ici en 15 à 30 secondes, proprement structuré.",
+}: CompteRenduBoxProps) {
+  // Ce que l'utilisateur voit dans la textarea (peut être joliment indenté)
+  const [editorValue, setEditorValue] = useState<string>(value);
+  const lastValueRef = useRef<string>(value);
+
+  // Sync : quand value change depuis l'extérieur (ex : nouveau CR généré),
+  // on met à jour l'éditeur — sinon on garde ce que l'utilisateur tape.
+  useEffect(() => {
+    if (value !== lastValueRef.current) {
+      lastValueRef.current = value;
+      // En mode édition, on montre du Markdown allégé (sans balises)
+      setEditorValue(editing && isHtml(value) ? htmlToMarkdown(value) : value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  // HTML rendu pour l'aperçu — smart : HTML natif ou conversion texte→HTML
+  const renderedHtml = useMemo(() => {
+    if (!value) return "";
+    return isHtml(value) ? value : plainToHtml(value);
+  }, [value]);
+
+  // Stats
+  const plainText = useMemo(
+    () => (isHtml(value) ? stripHtml(value) : value),
+    [value],
+  );
+  const wordCount = plainText.trim() ? plainText.trim().split(/\s+/).length : 0;
+  const charCount = plainText.length;
+
+  function handleEditorChange(next: string) {
+    setEditorValue(next);
+    onChange(next);
+  }
+
+  function switchTo(mode: "edit" | "view") {
+    if (mode === "edit") {
+      // On passe le HTML brut en Markdown allégé pour une édition sans balises
+      const md = isHtml(value) ? htmlToMarkdown(value) : value;
+      setEditorValue(md);
+      onChange(md); // stocker aussi la version Markdown (le viewer sait la re-convertir)
+      onToggleEditing(true);
+    } else {
+      onToggleEditing(false);
+    }
+  }
+
+  function copyToClipboard() {
+    const html = renderedHtml || plainText;
+    try {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plainText], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      void navigator.clipboard.writeText(plainText);
+    }
+  }
+
+  const defaultPlaceholder = `Le contenu apparaîtra ici après génération, ou rédigez-le en Markdown allégé :
+
+# Titre principal
+## Sous-section
+### Détail
+
+- Point de liste
+- Autre point
+
+**Gras** et *italique* fonctionnent aussi.
+
+L'aperçu convertira automatiquement en HTML propre.`;
+
+  return (
+    <div className={styles.crBox}>
+      <div className={styles.crHeader}>
+        <div className={styles.crHeaderLeft}>
+          <span className={styles.crHeaderIcon}>{icon}</span>
+          <div>
+            <div className={styles.crHeaderTitle}>{title}</div>
+            {value && (
+              <div className={styles.crHeaderMeta}>
+                {wordCount.toLocaleString("fr-FR")} mot{wordCount !== 1 ? "s" : ""} ·{" "}
+                {charCount.toLocaleString("fr-FR")} caractère{charCount !== 1 ? "s" : ""}
+                {isGeneratedByReqVet && " · généré par ReqVet"}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {value && (
+          <div className={styles.crHeaderActions}>
+            <button
+              className={styles.crToolbarBtn}
+              title={`Copier — ${title}`}
+              onClick={copyToClipboard}
+              type="button"
+            >
+              📋 Copier
+            </button>
+            <button
+              className={`${styles.crToolbarBtn} ${!editing ? styles.crToolbarBtnActive : ""}`}
+              onClick={() => switchTo(editing ? "view" : "edit")}
+              type="button"
+            >
+              {editing ? "👁 Aperçu" : "✏ Modifier"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className={styles.crBody}>
+        {editing ? (
+          <textarea
+            className={styles.crEditor}
+            value={editorValue}
+            onChange={(e) => handleEditorChange(e.target.value)}
+            placeholder={placeholder ?? `${defaultPlaceholder}
+
+# Titre principal
+## Sous-section
+### Détail
+
+- Point de liste
+- Autre point
+
+**Gras** et *italique* fonctionnent aussi.
+
+L'aperçu convertira automatiquement en HTML propre.`}
+            spellCheck={false}
+          />
+        ) : value ? (
+          <div
+            className={styles.crViewer}
+            dangerouslySetInnerHTML={{ __html: renderedHtml }}
+          />
+        ) : (
+          <div className={styles.crEmpty}>
+            <div className={styles.crEmptyIcon}>⚡</div>
+            <p className={styles.crEmptyTitle}>{emptyTitle}</p>
+            <p className={styles.crEmptySub}>{emptySubtitle}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Prépare le HTML pour l'édition — indente et respace pour la lisibilité.
+ * Préserve la structure (pas de destruction comme stripHtml).
+ */
+function prettifyHtml(html: string): string {
+  if (!html) return "";
+
+  return (
+    html
+      // Séparation des tags collés
+      .replace(/>\s*</g, ">\n<")
+      // Blocs sur nouvelle ligne
+      .replace(
+        /<(h[1-6]|p|div|section|article|ul|ol|table|thead|tbody|tr|blockquote|hr)([^>]*)>/gi,
+        "\n<$1$2>",
+      )
+      .replace(
+        /<\/(h[1-6]|p|div|section|article|ul|ol|table|thead|tbody|tr|blockquote)>/gi,
+        "</$1>\n",
+      )
+      // <li> avec indentation
+      .replace(/<li>/gi, "  <li>")
+      // Éviter les triples sauts de ligne
+      .replace(/\n{3,}/g, "\n\n")
+      // Nettoyer les entités communes
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .trim()
+  );
+}
+
+/**
+ * Détecte si un contenu est déjà du HTML (contient au moins un tag).
+ */
+function isHtml(text: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(text);
+}
+
+/**
+ * Convertit du HTML (retour engine) en Markdown allégé — pour édition confortable
+ * SANS balises. L'utilisateur voit :
+ *   ## Titre au lieu de <h2>Titre</h2>
+ *   - Item au lieu de <li>Item</li>
+ *   **Gras** au lieu de <strong>Gras</strong>
+ */
+function htmlToMarkdown(html: string): string {
+  return (
+    html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<hr\s*\/?>/gi, "\n\n---\n\n")
+      .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n\n")
+      .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n\n")
+      .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n\n")
+      .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, "\n#### $1\n\n")
+      .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**")
+      .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**")
+      .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*")
+      .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, "*$1*")
+      .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+      .replace(/<\/(ul|ol)>/gi, "\n")
+      .replace(/<(ul|ol)[^>]*>/gi, "")
+      .replace(/<\/(p|div|section|article|blockquote)[^>]*>/gi, "\n\n")
+      .replace(/<(p|div|section|article|blockquote)[^>]*>/gi, "")
+      // Strip toutes balises restantes
+      .replace(/<[^>]+>/g, "")
+      // Décoder les entités communes
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      // Nettoyage
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .trim()
+  );
+}
+
+/**
+ * Convertit du Markdown allégé en HTML.
+ * Reconnaît : titres (# ## ### ####), listes (- ou *), gras (**), italique (*), séparateur (---).
+ */
+function plainToHtml(text: string): string {
+  const inline = (str: string): string =>
+    str
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, "<em>$1</em>");
+
+  return text
+    .split(/\n{2,}/)
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return "";
+
+      // Séparateur ---
+      if (/^-{3,}$/.test(trimmed)) return "<hr>";
+
+      // Titre # / ## / ### / ####
+      const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+      if (heading) {
+        const level = heading[1].length + 1; // # → h2, ## → h3…
+        return `<h${Math.min(level, 6)}>${inline(heading[2].trim())}</h${Math.min(level, 6)}>`;
+      }
+
+      // Liste (- item ou * item)
+      if (/^[-*]\s+/.test(trimmed)) {
+        const items = trimmed
+          .split("\n")
+          .filter((l) => /^[-*]\s+/.test(l))
+          .map((l) => `<li>${inline(l.replace(/^[-*]\s+/, "").trim())}</li>`)
+          .join("");
+        return `<ul>${items}</ul>`;
+      }
+
+      // Sinon paragraphe (préserve les sauts de ligne simples en <br>)
+      return `<p>${inline(trimmed.replace(/\n/g, "<br>"))}</p>`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 // ─── Sub-components ─────────────────────────────────────────
 
 function Section({
@@ -1126,14 +1600,27 @@ function PipelineProgress({ status }: { status: JobStatus }) {
   const order = ["uploading", "pending", "transcribing", "generating", "completed"];
   const idx = order.indexOf(status);
 
+  // Étape considérée "en cours de spinning" — inclut aussi les phases d'attente
+  // sur lesquelles rien de visuel ne bouge sinon (pending → transcription à venir,
+  // amending → génération en cours).
+  function isSpinning(stepKey: string): boolean {
+    const stepIdx = order.indexOf(stepKey);
+    if (status === "completed") return false;
+    if (stepIdx === idx) return true;
+    if (status === "pending" && stepKey === "transcribing") return true;
+    if (status === "amending" && stepKey === "generating") return true;
+    return false;
+  }
+
   return (
     <div className={styles.pipelineSteps}>
       {steps.map((step, i) => {
         const stepIdx = order.indexOf(step.key);
+        const spinning = isSpinning(step.key);
+
         let cls = styles.pipelineStep;
         if (stepIdx < idx) cls += ` ${styles.pipelineStepDone}`;
-        else if (stepIdx === idx || (status === "pending" && step.key === "uploading")) cls += ` ${styles.pipelineStepActive}`;
-        else if (status === "amending" && step.key === "generating") cls += ` ${styles.pipelineStepActive}`;
+        else if (spinning || stepIdx === idx) cls += ` ${styles.pipelineStepActive}`;
 
         return (
           <div key={step.key} style={{ display: "flex", alignItems: "center", gap: 0 }}>
@@ -1144,7 +1631,7 @@ function PipelineProgress({ status }: { status: JobStatus }) {
               />
             )}
             <div className={cls}>
-              {stepIdx < idx ? "✓ " : stepIdx === idx && status !== "completed" ? <><span className="spinner" />{" "}</> : ""}
+              {stepIdx < idx ? "✓ " : spinning ? <><span className="spinner" />{" "}</> : ""}
               {step.label}
             </div>
           </div>

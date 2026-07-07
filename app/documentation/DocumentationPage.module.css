@@ -1,0 +1,565 @@
+/* app/documentation/DocumentationPage.module.css */
+
+.page {
+  min-height: 100vh;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* ── Hero ──────────────────────────────────────────────────── */
+
+.hero {
+  background: linear-gradient(180deg, #ffffff 0%, var(--bg-app) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 56px 24px 40px;
+}
+
+.heroInner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.heroTitle {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.heroTagline {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--accent);
+  margin: 0 0 12px;
+}
+
+.heroSubtitle {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 640px;
+  margin: 0 0 20px;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btnPrimary,
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  text-decoration: none;
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+.btnPrimary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btnGhost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btnGhost:hover { background: var(--bg-surface-hover); }
+
+/* ── Layout : sidebar + content ────────────────────────────── */
+
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 40px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 96px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* ── TOC sidebar ───────────────────────────────────────────── */
+
+.toc {
+  position: sticky;
+  top: 20px;
+  padding-top: 4px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+@media (max-width: 860px) {
+  .toc {
+    position: relative;
+    top: auto;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    max-height: none;
+  }
+}
+
+.tocTitle {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.tocList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tocList li {
+  margin: 2px 0;
+}
+
+.tocLink,
+.tocLinkActive {
+  display: block;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition), background var(--transition);
+}
+
+.tocLink:hover {
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.tocLinkActive {
+  color: var(--accent);
+  background: var(--accent-light);
+  font-weight: 600;
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+
+/* ── Content ───────────────────────────────────────────────── */
+
+.content {
+  min-width: 0;
+}
+
+.section {
+  scroll-margin-top: 20px;
+  margin-bottom: 48px;
+}
+
+.section:last-child { margin-bottom: 0; }
+
+.kicker {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  margin: 0 0 8px;
+}
+
+.lead {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0 0 16px;
+}
+
+.h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 24px 0 8px;
+}
+
+.para {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.para strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.para code,
+.lead code,
+.h3 code,
+.callout code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── Code block ────────────────────────────────────────────── */
+
+.codeBlock {
+  position: relative;
+  background: #0f172a;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 12px 0 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.codeLabel {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #64748b;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+  letter-spacing: 0.03em;
+}
+
+.codeBlock pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: #e2e8f0;
+}
+
+.copyBtn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: background var(--transition);
+  z-index: 2;
+}
+
+.copyBtn:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* ── Callout ───────────────────────────────────────────────── */
+
+.callout {
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-light);
+  margin: 14px 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.callout strong {
+  display: block;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+}
+
+.calloutWarn {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+.calloutWarn strong { color: var(--warning); }
+
+.calloutOk {
+  border-left-color: var(--success);
+  background: var(--success-bg);
+}
+.calloutOk strong { color: var(--success); }
+
+/* ── Table ─────────────────────────────────────────────────── */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 12px 0 16px;
+  font-size: 12.5px;
+}
+
+.table thead {
+  background: var(--bg-inset);
+}
+
+.table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.table tbody tr:last-child td { border-bottom: none; }
+
+.table td strong { color: var(--text-primary); font-weight: 600; }
+
+.table td code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--bg-inset);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+/* ── Fact grid ─────────────────────────────────────────────── */
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.factCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.factCard span {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.factCard strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── Flow diagram ──────────────────────────────────────────── */
+
+.archDiagram {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.archLayer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.archLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.archBox {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--accent-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.archBox strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.archBox span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.archArrow {
+  text-align: center;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 0;
+}
+
+/* ── Ordered flow list ─────────────────────────────────────── */
+
+.flowList {
+  list-style: none;
+  counter-reset: step;
+  margin: 12px 0 16px;
+  padding: 0;
+}
+
+.flowList li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 32px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.flowList li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 11px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flowList li strong { color: var(--text-primary); font-weight: 600; }
+
+/* ── Plain list ────────────────────────────────────────────── */
+
+.plainList {
+  list-style: none;
+  margin: 8px 0 14px;
+  padding: 0;
+}
+
+.plainList li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.plainList li::before {
+  content: '›';
+  position: absolute;
+  left: 4px;
+  top: -1px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.plainList li strong { color: var(--text-primary); font-weight: 600; }
+.plainList li code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--bg-inset);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+/* ── Method badges ─────────────────────────────────────────── */
+
+.methodBadge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+  min-width: 44px;
+  text-align: center;
+}
+
+.methodGET { background: #0369a1; }
+.methodPOST { background: #059669; }
+.methodPUT { background: #b45309; }
+.methodPATCH { background: #7c3aed; }
+.methodDELETE { background: #b91c1c; }
