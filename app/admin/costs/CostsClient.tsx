@@ -49,11 +49,10 @@ interface ClinicUsageRow {
   totalCost: number;
 }
 
-type PricingModel = "per_cr" | "subscription";
-
 // ─── Constantes ───────────────────────────────────────────
 
 const USD_TO_EUR = 0.92;
+const FALLBACK_COST_PER_CR = 0.04; // €, si aucun CR généré ce mois
 
 // ─── Formatage ────────────────────────────────────────────
 
@@ -65,22 +64,30 @@ const costUsdToEur = (usd: number): number => usd * USD_TO_EUR;
 
 // ─── LocalStorage helper (simulateur) ─────────────────────
 
-const STORAGE_KEY = "vetpulse.admin.pricing";
+const STORAGE_KEY = "vetpulse.admin.pricing.v2";
 
 interface Pricing {
-  model: PricingModel;
-  perCrPrice: number;
-  subscriptionPrice: number;
-  includedCrs: number;
-  overagePrice: number;
+  // Coût fournisseur — sync avec Bloc 1 par défaut, éditable
+  costPerCr: number;
+  // Pack forfaitaire
+  packSize: number;      // nb CR inclus par pack
+  packPrice: number;     // € / mois
+  // Pay-as-you-go
+  payAsYouGoPrice: number; // € / CR facturé
+  // Projection multi-cliniques
+  nbClinics: number;
+  pctPackModel: number;   // % de cliniques sur Pack (reste sur PAYG)
+  investment: number;      // € — cession + setup + dev
 }
 
 const DEFAULT_PRICING: Pricing = {
-  model: "subscription",
-  perCrPrice: 1.5,
-  subscriptionPrice: 39,
-  includedCrs: 200,
-  overagePrice: 0.15,
+  costPerCr: FALLBACK_COST_PER_CR,
+  packSize: 200,
+  packPrice: 20,
+  payAsYouGoPrice: 0.15,
+  nbClinics: 50,
+  pctPackModel: 70,
+  investment: 60000,
 };
 
 function loadPricing(): Pricing {
@@ -319,21 +326,57 @@ export default function CostsClient() {
     totalCostEur,
   ]);
 
-  // ─── Calculs BLOC 2 (simulation one-shot pire cas) ──
-  //
-  // Simulateur d'une offre unique : « si je vends un pack de X CR à Y€,
-  // quelle est ma marge MINIMUM si le client consomme tout ? »
-  // Base de coût : coût moyen d'un CR calculé au bloc 1 (avgCostPerCr).
+  // ─── Auto-sync du coût / CR sur le Bloc 1 (une seule fois) ──
+  // Si le Bloc 1 a des données réelles (avgCostPerCr > 0) et que le user
+  // n'a pas encore modifié la valeur (encore au fallback 0,04 €),
+  // on synchronise automatiquement.
+  useEffect(() => {
+    if (avgCostPerCr > 0 && pricing.costPerCr === FALLBACK_COST_PER_CR) {
+      setPricing((p) => ({ ...p, costPerCr: avgCostPerCr }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avgCostPerCr]);
 
-  const packRevenue =
-    pricing.model === "subscription"
-      ? pricing.subscriptionPrice
-      : pricing.includedCrs * pricing.perCrPrice;
-  const packMaxCost = pricing.includedCrs * avgCostPerCr;
+  // ─── Calculs BLOC 2A — Rentabilité par clinique ────────────
+  //
+  // Comparaison PACK vs PAY-AS-YOU-GO à consommation identique
+  // (packSize CR/mois par clinique — hypothèse pire cas côté pack).
+
+  // Pack — coût max si la clinique consomme tout son forfait
+  const packRevenue = pricing.packPrice;
+  const packMaxCost = pricing.packSize * pricing.costPerCr;
   const packMinMargin = packRevenue - packMaxCost;
   const packMinMarginPct = packRevenue > 0 ? (packMinMargin / packRevenue) * 100 : 0;
-  const marginPerCr =
-    pricing.includedCrs > 0 ? packMinMargin / pricing.includedCrs : 0;
+  const packMarginPerCr = pricing.packSize > 0 ? packMinMargin / pricing.packSize : 0;
+
+  // Pay-as-you-go — à consommation équivalente (packSize CR)
+  const paygRevenueEquiv = pricing.packSize * pricing.payAsYouGoPrice;
+  const paygCostEquiv = pricing.packSize * pricing.costPerCr;
+  const paygMarginEquiv = paygRevenueEquiv - paygCostEquiv;
+  const paygMarginPct =
+    paygRevenueEquiv > 0 ? (paygMarginEquiv / paygRevenueEquiv) * 100 : 0;
+  const paygMarginPerCr = pricing.payAsYouGoPrice - pricing.costPerCr;
+
+  // ─── Calculs BLOC 2B — Projection multi-cliniques ──────────
+  //
+  // Hypothèses : chaque clinique consomme packSize CR/mois (même conso
+  // sous les deux modèles pour comparer à volume constant).
+  //   Pack     : nbPackClinics × packPrice     (revenu fixe indépendant du volume)
+  //   PAYG     : nbPAYGClinics × packSize × payAsYouGoPrice
+  //   Coût     : nbClinics × packSize × costPerCr
+
+  const nbPackClinics = Math.round((pricing.nbClinics * pricing.pctPackModel) / 100);
+  const nbPAYGClinics = pricing.nbClinics - nbPackClinics;
+
+  const monthlyRevenuePack = nbPackClinics * pricing.packPrice;
+  const monthlyRevenuePAYG = nbPAYGClinics * pricing.packSize * pricing.payAsYouGoPrice;
+  const monthlyRevenue = monthlyRevenuePack + monthlyRevenuePAYG;
+
+  const monthlyCost = pricing.nbClinics * pricing.packSize * pricing.costPerCr;
+  const monthlyMargin = monthlyRevenue - monthlyCost;
+  const monthlyMarginPct = monthlyRevenue > 0 ? (monthlyMargin / monthlyRevenue) * 100 : 0;
+  const yearlyMargin = monthlyMargin * 12;
+  const roiMonths = monthlyMargin > 0 ? pricing.investment / monthlyMargin : null;
 
   // ─── Rendu ─────────────────────────────────────────
 
@@ -531,7 +574,7 @@ export default function CostsClient() {
       </div>
 
       {/* ═══════════════════════════════════════════════════ */}
-      {/* BLOC 2 — SIMULATEUR DE RENTABILITÉ                  */}
+      {/* BLOC 2A — RENTABILITÉ PAR CLINIQUE (comparaison)     */}
       {/* ═══════════════════════════════════════════════════ */}
 
       <div
@@ -544,209 +587,361 @@ export default function CostsClient() {
       >
         <div>
           <span className={controls.blockTag}>Bloc 2</span>
-          <h2 className={controls.blockTitle}>Simulateur de rentabilité par clinique</h2>
+          <h2 className={controls.blockTitle}>Rentabilité par clinique — Pack vs Pay-as-you-go</h2>
           <p className={controls.blockSubtitle}>
-            Basé sur le coût moyen réel de <strong>{fmtEurFine(avgCostPerCr)}</strong>{" "}
-            par CR calculé au-dessus. Ajustez votre grille tarifaire — la marge se
-            recalcule instantanément sur toutes vos cliniques.
+            Comparez la marge d&apos;un pack forfaitaire (ex. 200 CR à 20 €) avec une
+            facturation à l&apos;usage, à volume identique. Toutes les valeurs sont
+            éditables — la simulation se met à jour instantanément.
           </p>
         </div>
       </div>
 
       <div className={styles.section}>
-        {/* Toggle modèle */}
-        <div className={controls.modelToggle}>
-          <button
-            className={`${controls.modelTab} ${pricing.model === "per_cr" ? controls.modelTabActive : ""}`}
-            onClick={() => setPricing({ ...pricing, model: "per_cr" })}
-          >
-            💵 Prix par CR - Pay as you go
-          </button>
-          <button
-            className={`${controls.modelTab} ${pricing.model === "subscription" ? controls.modelTabActive : ""}`}
-            onClick={() => setPricing({ ...pricing, model: "subscription" })}
-          >
-            📅 Abonnement mensuel ou pack
-          </button>
+        {/* Coût moyen fournisseur — commun aux deux modèles */}
+        <div className={controls.controls} style={{ marginBottom: 24 }}>
+          <div className={controls.field}>
+            <label>Coût moyen fournisseur par CR</label>
+            <div className={controls.inputWithSuffix}>
+              <input
+                type="number"
+                step={0.001}
+                min={0}
+                value={pricing.costPerCr}
+                onChange={(e) =>
+                  setPricing({ ...pricing, costPerCr: Number(e.target.value) || 0 })
+                }
+              />
+              <span>€ / CR</span>
+            </div>
+            <span className={controls.hint}>
+              {avgCostPerCr > 0
+                ? `Synchronisé auto sur le Bloc 1 (${fmtEurFine(avgCostPerCr)}). Modifiable.`
+                : `Défaut ${fmtEurFine(FALLBACK_COST_PER_CR)} — pas encore de CR ce mois pour calibrer.`}
+            </span>
+          </div>
         </div>
 
-        {/* Contrôles */}
-        {pricing.model === "per_cr" ? (
-          <div className={controls.controls}>
-            <div className={controls.field}>
-              <label>Prix par compte rendu généré</label>
-              <div className={controls.inputWithSuffix}>
-                <input
-                  type="number"
-                  step={0.1}
-                  min={0}
-                  value={pricing.perCrPrice}
-                  onChange={(e) =>
-                    setPricing({ ...pricing, perCrPrice: Number(e.target.value) || 0 })
-                  }
-                />
-                <span>€ / CR</span>
-              </div>
-              <span className={controls.hint}>
-                Facturation à l&apos;usage — simple, transparent pour la clinique.
-              </span>
+        {/* Comparaison Pack vs PAYG */}
+        <div className={controls.comparison}>
+          {/* ─── Colonne PACK ─── */}
+          <div className={controls.comparisonCard}>
+            <div className={controls.comparisonHead}>
+              <span className={controls.comparisonBadge}>📦 Pack forfaitaire</span>
+              <h3>Prix fixe mensuel · nb CR inclus</h3>
             </div>
-          </div>
-        ) : (
-          <div className={controls.controls}>
-            <div className={controls.field}>
-              <label>Prix de l&apos;abonnement mensuel</label>
-              <div className={controls.inputWithSuffix}>
-                <input
-                  type="number"
-                  step={1}
-                  min={0}
-                  value={pricing.subscriptionPrice}
-                  onChange={(e) =>
-                    setPricing({
-                      ...pricing,
-                      subscriptionPrice: Number(e.target.value) || 0,
-                    })
-                  }
-                />
-                <span>€ / mois</span>
+
+            <div className={controls.controls}>
+              <div className={controls.field}>
+                <label>CR inclus / mois</label>
+                <div className={controls.inputWithSuffix}>
+                  <input
+                    type="number"
+                    step={10}
+                    min={0}
+                    value={pricing.packSize}
+                    onChange={(e) =>
+                      setPricing({ ...pricing, packSize: Number(e.target.value) || 0 })
+                    }
+                  />
+                  <span>CR</span>
+                </div>
+              </div>
+              <div className={controls.field}>
+                <label>Prix du pack</label>
+                <div className={controls.inputWithSuffix}>
+                  <input
+                    type="number"
+                    step={1}
+                    min={0}
+                    value={pricing.packPrice}
+                    onChange={(e) =>
+                      setPricing({ ...pricing, packPrice: Number(e.target.value) || 0 })
+                    }
+                  />
+                  <span>€ / mois</span>
+                </div>
               </div>
             </div>
 
-            <div className={controls.field}>
-              <label>CR inclus / mois</label>
-              <div className={controls.inputWithSuffix}>
-                <input
-                  type="number"
-                  step={10}
-                  min={0}
-                  value={pricing.includedCrs}
-                  onChange={(e) =>
-                    setPricing({ ...pricing, includedCrs: Number(e.target.value) || 0 })
-                  }
-                />
-                <span>CR</span>
+            <div className={controls.comparisonResults}>
+              <div className={controls.resultRow}>
+                <span>Revenu par clinique</span>
+                <strong>{fmtEur(packRevenue)}</strong>
+              </div>
+              <div className={controls.resultRow}>
+                <span>Coût max (pack consommé)</span>
+                <strong>{fmtEur(packMaxCost)}</strong>
+              </div>
+              <div className={controls.resultRow} data-highlight>
+                <span>Marge minimum</span>
+                <strong style={{ color: packMinMargin >= 0 ? "#065f46" : "#dc2626" }}>
+                  {fmtEur(packMinMargin)}
+                  <span className={controls.resultPct}>
+                    · {packMinMarginPct.toFixed(0)}%
+                  </span>
+                </strong>
+              </div>
+              <div className={controls.resultRow}>
+                <span>Marge min par CR</span>
+                <strong style={{ color: packMarginPerCr >= 0 ? "#065f46" : "#dc2626" }}>
+                  {fmtEurFine(packMarginPerCr)}
+                </strong>
               </div>
             </div>
-
-            <div className={controls.field}>
-              <label>Prix par CR supplémentaire</label>
-              <div className={controls.inputWithSuffix}>
-                <input
-                  type="number"
-                  step={0.01}
-                  min={0}
-                  value={pricing.overagePrice}
-                  onChange={(e) =>
-                    setPricing({
-                      ...pricing,
-                      overagePrice: Number(e.target.value) || 0,
-                    })
-                  }
-                />
-                <span>€ / CR au-delà</span>
-              </div>
-              <span className={controls.hint}>
-                Facturé pour chaque CR au-delà du forfait.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Résumé one-shot */}
-        <div className={controls.summary}>
-          {pricing.model === "per_cr" ? (
-            <p>
-              Grille : <strong>{fmtEur(pricing.perCrPrice)}</strong> par CR généré ·
-              coût moyen réel <strong>{fmtEurFine(avgCostPerCr)}</strong> par CR.
-              <br />
-              Marge <strong>par CR généré</strong> ={" "}
-              <strong
-                style={{
-                  color:
-                    pricing.perCrPrice - avgCostPerCr >= 0 ? "#065f46" : "#dc2626",
-                }}
-              >
-                {fmtEur(pricing.perCrPrice - avgCostPerCr)}
-              </strong>
-              {pricing.perCrPrice > 0 &&
-                ` · ${Math.round(((pricing.perCrPrice - avgCostPerCr) / pricing.perCrPrice) * 100)}% de marge brute`}
-              .
+            <p className={controls.comparisonNote}>
+              🎯 Marge <strong>garantie minimum</strong> — si la clinique consomme moins,
+              elle est meilleure. Modèle prévisible côté trésorerie.
             </p>
-          ) : (
-            <p>
-              Pack : <strong>{pricing.includedCrs} CR à {fmtEur(pricing.subscriptionPrice)}</strong>.
-              Si la clinique <strong>consomme tout son forfait</strong>{" "}
-              ({pricing.includedCrs} × {fmtEurFine(avgCostPerCr)}) : coût max ={" "}
-              <strong>{fmtEur(packMaxCost)}</strong> · marge <strong>MINIMUM</strong>{" "}
-              par pack ={" "}
-              <strong
-                style={{
-                  color: packMinMargin >= 0 ? "#065f46" : "#dc2626",
-                }}
-              >
-                {fmtEur(packMinMargin)}
-              </strong>{" "}
-              ({packMinMarginPct.toFixed(0)}%). En pratique, la marge réelle sera
-              supérieure — les cliniques consomment souvent moins que leur quota.
+          </div>
+
+          {/* ─── Colonne PAYG ─── */}
+          <div className={controls.comparisonCard}>
+            <div className={controls.comparisonHead}>
+              <span className={controls.comparisonBadge}>💰 Pay-as-you-go</span>
+              <h3>Facturation à l&apos;usage · par CR généré</h3>
+            </div>
+
+            <div className={controls.controls}>
+              <div className={controls.field}>
+                <label>Prix par CR facturé</label>
+                <div className={controls.inputWithSuffix}>
+                  <input
+                    type="number"
+                    step={0.01}
+                    min={0}
+                    value={pricing.payAsYouGoPrice}
+                    onChange={(e) =>
+                      setPricing({
+                        ...pricing,
+                        payAsYouGoPrice: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <span>€ / CR</span>
+                </div>
+                <span className={controls.hint}>
+                  Simulation à volume identique ({pricing.packSize} CR/mois) pour comparaison.
+                </span>
+              </div>
+            </div>
+
+            <div className={controls.comparisonResults}>
+              <div className={controls.resultRow}>
+                <span>Revenu par clinique ({pricing.packSize} CR)</span>
+                <strong>{fmtEur(paygRevenueEquiv)}</strong>
+              </div>
+              <div className={controls.resultRow}>
+                <span>Coût fournisseur ({pricing.packSize} CR)</span>
+                <strong>{fmtEur(paygCostEquiv)}</strong>
+              </div>
+              <div className={controls.resultRow} data-highlight>
+                <span>Marge à volume équivalent</span>
+                <strong style={{ color: paygMarginEquiv >= 0 ? "#065f46" : "#dc2626" }}>
+                  {fmtEur(paygMarginEquiv)}
+                  <span className={controls.resultPct}>
+                    · {paygMarginPct.toFixed(0)}%
+                  </span>
+                </strong>
+              </div>
+              <div className={controls.resultRow}>
+                <span>Marge par CR</span>
+                <strong style={{ color: paygMarginPerCr >= 0 ? "#065f46" : "#dc2626" }}>
+                  {fmtEurFine(paygMarginPerCr)}
+                </strong>
+              </div>
+            </div>
+            <p className={controls.comparisonNote}>
+              📈 Marge <strong>proportionnelle</strong> — plus la clinique génère, plus le
+              revenu monte. Aucun risque de sur-consommation.
             </p>
-          )}
+          </div>
+        </div>
+
+        {/* Verdict de comparaison */}
+        <div className={controls.summary} style={{ marginTop: 20 }}>
+          <p>
+            À consommation identique de <strong>{pricing.packSize} CR/mois</strong> par
+            clinique, le modèle <strong>Pack</strong> génère{" "}
+            <strong style={{ color: packMinMargin >= 0 ? "#065f46" : "#dc2626" }}>
+              {fmtEur(packMinMargin)}
+            </strong>{" "}
+            de marge et le modèle <strong>Pay-as-you-go</strong>{" "}
+            <strong style={{ color: paygMarginEquiv >= 0 ? "#065f46" : "#dc2626" }}>
+              {fmtEur(paygMarginEquiv)}
+            </strong>
+            .{" "}
+            {packMinMargin > paygMarginEquiv
+              ? "Le Pack est plus rentable à ce volume — préconisez-le en priorité."
+              : paygMarginEquiv > packMinMargin
+                ? "Le Pay-as-you-go est plus rentable à ce volume — utile pour les cliniques à forte consommation."
+                : "Les deux modèles sont équivalents à ce volume."}
+          </p>
         </div>
       </div>
 
-      {/* KPI one-shot */}
-      <div className={styles.kpiGrid}>
-        <div className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>Revenu par pack</span>
-          <span className={`${styles.kpiValue} ${styles.kpiAccent}`}>
-            {fmtEur(packRevenue)}
-          </span>
-          <span className={styles.kpiSub}>
-            {pricing.model === "subscription"
-              ? `Prix de l'abonnement pour ${pricing.includedCrs} CR inclus`
-              : `${pricing.includedCrs} CR × ${fmtEur(pricing.perCrPrice)}`}
-          </span>
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* BLOC 2B — PROJECTION MULTI-CLINIQUES & ROI          */}
+      {/* ═══════════════════════════════════════════════════ */}
+
+      <div
+        className={controls.blockHeader}
+        style={{
+          marginTop: 40,
+          paddingTop: 32,
+          borderTop: "2px dashed rgba(0, 209, 125, 0.30)",
+        }}
+      >
+        <div>
+          <span className={controls.blockTag}>Bloc 3</span>
+          <h2 className={controls.blockTitle}>Projection multi-cliniques &amp; ROI</h2>
+          <p className={controls.blockSubtitle}>
+            Vision haut niveau : ajustez le nombre de cliniques et la répartition
+            Pack / Pay-as-you-go pour projeter le CA mensuel, la marge brute annuelle,
+            et le temps de retour sur investissement.
+          </p>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <div className={controls.controls}>
+          <div className={controls.field}>
+            <label>Nombre de cliniques clientes</label>
+            <div className={controls.inputWithSuffix}>
+              <input
+                type="number"
+                step={1}
+                min={0}
+                value={pricing.nbClinics}
+                onChange={(e) =>
+                  setPricing({ ...pricing, nbClinics: Number(e.target.value) || 0 })
+                }
+              />
+              <span>cliniques</span>
+            </div>
+          </div>
+
+          <div className={controls.field}>
+            <label>% cliniques sur Pack forfaitaire</label>
+            <div className={controls.inputWithSuffix}>
+              <input
+                type="number"
+                step={5}
+                min={0}
+                max={100}
+                value={pricing.pctPackModel}
+                onChange={(e) =>
+                  setPricing({
+                    ...pricing,
+                    pctPackModel: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                  })
+                }
+              />
+              <span>%</span>
+            </div>
+            <span className={controls.hint}>
+              {nbPackClinics} × Pack · {nbPAYGClinics} × Pay-as-you-go
+            </span>
+          </div>
+
+          <div className={controls.field}>
+            <label>Investissement initial</label>
+            <div className={controls.inputWithSuffix}>
+              <input
+                type="number"
+                step={1000}
+                min={0}
+                value={pricing.investment}
+                onChange={(e) =>
+                  setPricing({ ...pricing, investment: Number(e.target.value) || 0 })
+                }
+              />
+              <span>€</span>
+            </div>
+            <span className={controls.hint}>
+              Cession reqvet-engine + setup infra + dev intégration
+            </span>
+          </div>
         </div>
 
-        <div className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>Coût pire cas</span>
-          <span className={styles.kpiValue}>{fmtEur(packMaxCost)}</span>
-          <span className={styles.kpiSub}>
-            Si les {pricing.includedCrs} CR sont tous consommés
-          </span>
+        {/* KPIs de projection */}
+        <div className={styles.kpiGrid}>
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>CA mensuel</span>
+            <span className={`${styles.kpiValue} ${styles.kpiAccent}`}>
+              {fmtEur(monthlyRevenue)}
+            </span>
+            <span className={styles.kpiSub}>
+              Pack {fmtEur(monthlyRevenuePack)} · PAYG {fmtEur(monthlyRevenuePAYG)}
+            </span>
+          </div>
+
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Coût fournisseurs mensuel</span>
+            <span className={styles.kpiValue}>{fmtEur(monthlyCost)}</span>
+            <span className={styles.kpiSub}>
+              {fmtNumber(pricing.nbClinics * pricing.packSize)} CR × {fmtEurFine(pricing.costPerCr)}
+            </span>
+          </div>
+
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Marge brute mensuelle</span>
+            <span
+              className={
+                monthlyMargin >= 0
+                  ? `${styles.kpiValue} ${styles.kpiAccent}`
+                  : `${styles.kpiValue} ${styles.kpiDanger}`
+              }
+            >
+              {fmtEur(monthlyMargin)}
+            </span>
+            <span className={styles.kpiSub}>
+              {monthlyMarginPct.toFixed(0)}% · annuel {fmtEur(yearlyMargin)}
+            </span>
+          </div>
+
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Retour sur investissement</span>
+            <span
+              className={
+                roiMonths !== null && roiMonths > 0
+                  ? `${styles.kpiValue} ${styles.kpiAccent}`
+                  : `${styles.kpiValue} ${styles.kpiDanger}`
+              }
+            >
+              {roiMonths !== null
+                ? roiMonths < 1
+                  ? `< 1 mois`
+                  : roiMonths < 24
+                    ? `${roiMonths.toFixed(1)} mois`
+                    : `${(roiMonths / 12).toFixed(1)} ans`
+                : "—"}
+            </span>
+            <span className={styles.kpiSub}>
+              {roiMonths !== null
+                ? `${fmtEur(pricing.investment)} ÷ marge mensuelle`
+                : "Marge négative — pas de ROI possible"}
+            </span>
+          </div>
         </div>
 
-        <div className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>Marge MIN par pack</span>
-          <span
-            className={
-              packMinMargin >= 0
-                ? `${styles.kpiValue} ${styles.kpiAccent}`
-                : `${styles.kpiValue} ${styles.kpiDanger}`
-            }
-          >
-            {fmtEur(packMinMargin)}
-          </span>
-          <span className={styles.kpiSub}>
-            {packMinMarginPct.toFixed(0)}% de marge brute
-          </span>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <span className={styles.kpiLabel}>Marge par CR</span>
-          <span
-            className={
-              marginPerCr >= 0
-                ? `${styles.kpiValue} ${styles.kpiAccent}`
-                : `${styles.kpiValue} ${styles.kpiDanger}`
-            }
-          >
-            {fmtEurFine(marginPerCr)}
-          </span>
-          <span className={styles.kpiSub}>
-            Ce que vous gagnez à chaque CR généré
-          </span>
-        </div>
+        {/* Verdict projection */}
+        {monthlyMargin > 0 && roiMonths !== null && (
+          <div className={controls.summary} style={{ marginTop: 20 }}>
+            <p>
+              Avec <strong>{pricing.nbClinics} cliniques</strong>{" "}
+              ({nbPackClinics} pack + {nbPAYGClinics} pay-as-you-go), CA mensuel de{" "}
+              <strong>{fmtEur(monthlyRevenue)}</strong> et marge brute annuelle de{" "}
+              <strong>{fmtEur(yearlyMargin)}</strong>. L&apos;investissement de{" "}
+              <strong>{fmtEur(pricing.investment)}</strong> est rentabilisé en{" "}
+              <strong>
+                {roiMonths < 12
+                  ? `${roiMonths.toFixed(1)} mois`
+                  : `${(roiMonths / 12).toFixed(1)} années`}
+              </strong>
+              .
+            </p>
+          </div>
+        )}
       </div>
 
       {stats && (
