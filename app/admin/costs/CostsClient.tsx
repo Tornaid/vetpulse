@@ -66,6 +66,8 @@ const costUsdToEur = (usd: number): number => usd * USD_TO_EUR;
 
 const STORAGE_KEY = "vetpulse.admin.pricing.v2";
 
+type ProjectionModel = "pack" | "payg";
+
 interface Pricing {
   // Coût fournisseur — sync avec Bloc 1 par défaut, éditable
   costPerCr: number;
@@ -76,7 +78,7 @@ interface Pricing {
   payAsYouGoPrice: number; // € / CR facturé
   // Projection multi-cliniques
   nbClinics: number;
-  pctPackModel: number;   // % de cliniques sur Pack (reste sur PAYG)
+  projectionModel: ProjectionModel; // scénario retenu pour le ROI
   investment: number;      // € — cession + setup + dev
 }
 
@@ -86,7 +88,7 @@ const DEFAULT_PRICING: Pricing = {
   packPrice: 20,
   payAsYouGoPrice: 0.15,
   nbClinics: 50,
-  pctPackModel: 70,
+  projectionModel: "pack",
   investment: 60000,
 };
 
@@ -359,24 +361,26 @@ export default function CostsClient() {
 
   // ─── Calculs BLOC 2B — Projection multi-cliniques ──────────
   //
-  // Hypothèses : chaque clinique consomme packSize CR/mois (même conso
-  // sous les deux modèles pour comparer à volume constant).
-  //   Pack     : nbPackClinics × packPrice     (revenu fixe indépendant du volume)
-  //   PAYG     : nbPAYGClinics × packSize × payAsYouGoPrice
-  //   Coût     : nbClinics × packSize × costPerCr
+  // Un seul modèle appliqué à toutes les cliniques (choix explicite via toggle) :
+  //   Pack  : nbClinics × packPrice                          (revenu fixe)
+  //   PAYG  : nbClinics × packSize × payAsYouGoPrice        (à volume packSize)
+  // Coût   : nbClinics × packSize × costPerCr
 
-  const nbPackClinics = Math.round((pricing.nbClinics * pricing.pctPackModel) / 100);
-  const nbPAYGClinics = pricing.nbClinics - nbPackClinics;
-
-  const monthlyRevenuePack = nbPackClinics * pricing.packPrice;
-  const monthlyRevenuePAYG = nbPAYGClinics * pricing.packSize * pricing.payAsYouGoPrice;
-  const monthlyRevenue = monthlyRevenuePack + monthlyRevenuePAYG;
+  const monthlyRevenue =
+    pricing.projectionModel === "pack"
+      ? pricing.nbClinics * pricing.packPrice
+      : pricing.nbClinics * pricing.packSize * pricing.payAsYouGoPrice;
 
   const monthlyCost = pricing.nbClinics * pricing.packSize * pricing.costPerCr;
   const monthlyMargin = monthlyRevenue - monthlyCost;
   const monthlyMarginPct = monthlyRevenue > 0 ? (monthlyMargin / monthlyRevenue) * 100 : 0;
   const yearlyMargin = monthlyMargin * 12;
   const roiMonths = monthlyMargin > 0 ? pricing.investment / monthlyMargin : null;
+
+  const projectionLabel =
+    pricing.projectionModel === "pack"
+      ? `Pack ${pricing.packSize} CR à ${fmtEur(pricing.packPrice)}`
+      : `Pay-as-you-go à ${fmtEur(pricing.payAsYouGoPrice)}/CR`;
 
   // ─── Rendu ─────────────────────────────────────────
 
@@ -803,6 +807,22 @@ export default function CostsClient() {
       </div>
 
       <div className={styles.section}>
+        {/* Toggle scénario : soit Pack pour tous, soit PAYG pour tous */}
+        <div className={controls.modelToggle} style={{ marginBottom: 24 }}>
+          <button
+            className={`${controls.modelTab} ${pricing.projectionModel === "pack" ? controls.modelTabActive : ""}`}
+            onClick={() => setPricing({ ...pricing, projectionModel: "pack" })}
+          >
+            📦 Scénario Pack forfaitaire
+          </button>
+          <button
+            className={`${controls.modelTab} ${pricing.projectionModel === "payg" ? controls.modelTabActive : ""}`}
+            onClick={() => setPricing({ ...pricing, projectionModel: "payg" })}
+          >
+            💰 Scénario Pay-as-you-go
+          </button>
+        </div>
+
         <div className={controls.controls}>
           <div className={controls.field}>
             <label>Nombre de cliniques clientes</label>
@@ -818,28 +838,8 @@ export default function CostsClient() {
               />
               <span>cliniques</span>
             </div>
-          </div>
-
-          <div className={controls.field}>
-            <label>% cliniques sur Pack forfaitaire</label>
-            <div className={controls.inputWithSuffix}>
-              <input
-                type="number"
-                step={5}
-                min={0}
-                max={100}
-                value={pricing.pctPackModel}
-                onChange={(e) =>
-                  setPricing({
-                    ...pricing,
-                    pctPackModel: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
-                  })
-                }
-              />
-              <span>%</span>
-            </div>
             <span className={controls.hint}>
-              {nbPackClinics} × Pack · {nbPAYGClinics} × Pay-as-you-go
+              Toutes sous le modèle <strong>{projectionLabel}</strong>
             </span>
           </div>
 
@@ -871,7 +871,9 @@ export default function CostsClient() {
               {fmtEur(monthlyRevenue)}
             </span>
             <span className={styles.kpiSub}>
-              Pack {fmtEur(monthlyRevenuePack)} · PAYG {fmtEur(monthlyRevenuePAYG)}
+              {pricing.projectionModel === "pack"
+                ? `${pricing.nbClinics} × ${fmtEur(pricing.packPrice)} / mois`
+                : `${fmtNumber(pricing.nbClinics * pricing.packSize)} CR × ${fmtEur(pricing.payAsYouGoPrice)}`}
             </span>
           </div>
 
@@ -928,9 +930,9 @@ export default function CostsClient() {
         {monthlyMargin > 0 && roiMonths !== null && (
           <div className={controls.summary} style={{ marginTop: 20 }}>
             <p>
-              Avec <strong>{pricing.nbClinics} cliniques</strong>{" "}
-              ({nbPackClinics} pack + {nbPAYGClinics} pay-as-you-go), CA mensuel de{" "}
-              <strong>{fmtEur(monthlyRevenue)}</strong> et marge brute annuelle de{" "}
+              Scénario <strong>{projectionLabel}</strong> appliqué à{" "}
+              <strong>{pricing.nbClinics} cliniques</strong> : CA mensuel{" "}
+              <strong>{fmtEur(monthlyRevenue)}</strong>, marge brute annuelle{" "}
               <strong>{fmtEur(yearlyMargin)}</strong>. L&apos;investissement de{" "}
               <strong>{fmtEur(pricing.investment)}</strong> est rentabilisé en{" "}
               <strong>
