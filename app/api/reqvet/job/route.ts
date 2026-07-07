@@ -24,13 +24,31 @@ export async function GET(req: NextRequest) {
     const localJob = await getJob(jobId);
 
     if (localJob && localJob.status === "completed") {
-      // Le webhook est déjà passé — on a tout
+      // Le webhook est déjà passé — enrichir avec les coûts (webhook ne les envoie pas)
+      let costs: { transcription_usd: number | null; generation_usd: number | null; total_usd: number | null } | null = null;
+      try {
+        const remoteJob = await reqvet.getJob(jobId) as {
+          cost_transcription?: number | string | null;
+          cost_generation?: number | string | null;
+        };
+        const t = remoteJob.cost_transcription != null ? Number(remoteJob.cost_transcription) : null;
+        const g = remoteJob.cost_generation != null ? Number(remoteJob.cost_generation) : null;
+        costs = {
+          transcription_usd: t,
+          generation_usd: g,
+          total_usd: (t ?? 0) + (g ?? 0),
+        };
+      } catch {
+        // pas bloquant — on affiche le CR sans les coûts
+      }
+
       return NextResponse.json({
         status: localJob.status,
         html: localJob.html,
         transcription: localJob.transcription,
         fields: localJob.fields ? JSON.parse(localJob.fields) : null,
         amendment_number: localJob.amendment_number,
+        costs,
       });
     }
 
@@ -47,6 +65,8 @@ export async function GET(req: NextRequest) {
       status: string;
       transcription?: string | null;
       result?: { html?: string | null; fields?: Record<string, unknown> | null };
+      cost_transcription?: number | string | null;
+      cost_generation?: number | string | null;
     };
 
     // Si le job est completed côté ReqVet mais pas encore en base
@@ -61,12 +81,18 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const t = remoteJob.cost_transcription != null ? Number(remoteJob.cost_transcription) : null;
+    const g = remoteJob.cost_generation != null ? Number(remoteJob.cost_generation) : null;
+
     return NextResponse.json({
       status: remoteJob.status,
       html: remoteJob.result?.html ?? null,
       transcription: remoteJob.transcription ?? null,
       fields: remoteJob.result?.fields ?? null,
       amendment_number: localJob?.amendment_number ?? 0,
+      costs: (t != null || g != null)
+        ? { transcription_usd: t, generation_usd: g, total_usd: (t ?? 0) + (g ?? 0) }
+        : null,
     });
   } catch (err: unknown) {
     console.error("[ReqVet job] Error:", err);

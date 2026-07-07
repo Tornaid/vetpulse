@@ -80,6 +80,11 @@ export default function ConsultationView({
     transcription: string;
     fields: Record<string, unknown> | null;
     amendment_number: number;
+    costs: {
+      transcription_usd: number | null;
+      generation_usd: number | null;
+      total_usd: number | null;
+    } | null;
   } | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const [extraInstructions, setExtraInstructions] = useState("");
@@ -186,6 +191,7 @@ export default function ConsultationView({
             transcription: data.transcription ?? "",
             fields: data.fields ?? null,
             amendment_number: data.amendment_number ?? 0,
+            costs: data.costs ?? null,
           });
           clearInterval(pollRef.current);
         } else if (data.status === "failed") {
@@ -856,6 +862,46 @@ Sera extrait automatiquement par ReqVet si le field_schema est configuré.`}
                         ↺ Nouvelle consultation
                       </button>
                     </div>
+
+                    {/* Pipeline metrics — coûts transcription + génération */}
+                    {report.costs && (
+                      <div className={styles.pipelineMetrics}>
+                        <span className={styles.pipelineMetricsLabel}>Pipeline ReqVet</span>
+                        <div className={styles.pipelineMetric}>
+                          <span className={styles.pipelineMetricIcon}>🎙️</span>
+                          <div>
+                            <div className={styles.pipelineMetricName}>Transcription</div>
+                            <div className={styles.pipelineMetricValue}>
+                              {report.costs.transcription_usd != null
+                                ? `$${report.costs.transcription_usd.toFixed(4)}`
+                                : "—"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={styles.pipelineMetric}>
+                          <span className={styles.pipelineMetricIcon}>🧠</span>
+                          <div>
+                            <div className={styles.pipelineMetricName}>Génération LLM</div>
+                            <div className={styles.pipelineMetricValue}>
+                              {report.costs.generation_usd != null
+                                ? `$${report.costs.generation_usd.toFixed(4)}`
+                                : "—"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={`${styles.pipelineMetric} ${styles.pipelineMetricTotal}`}>
+                          <span className={styles.pipelineMetricIcon}>💲</span>
+                          <div>
+                            <div className={styles.pipelineMetricName}>Total pipeline</div>
+                            <div className={styles.pipelineMetricValue}>
+                              {report.costs.total_usd != null
+                                ? `$${report.costs.total_usd.toFixed(4)}`
+                                : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Tab: Report */}
                     {activeTab === "report" && (
